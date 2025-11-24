@@ -103,4 +103,9 @@ public class UserController {
                     .body(new AuthResponse("Error fetching user details"));
         }
     }
+
+    @GetMapping("/health")
+    public ResponseEntity<String> health() {
+        return ResponseEntity.ok("Report Generator Service is running");
+    }
 }
