@@ -36,7 +36,7 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
                         // Public endpoints - bina login ke access ho sakte hain
-                        .requestMatchers("/api/user/register", "/api/user/login", "/api/user/health", "/api/feedback/**", "/api/reports/count", "/api/stats/**").permitAll()
+                        .requestMatchers("/api/user/**", "/api/feedback/**", "/api/reports/count", "/api/stats/**").permitAll()
                         // Download endpoint - login required hai lekin download ke liye accessible
                         .requestMatchers("/api/reports/download/**").authenticated()
                         // Protected endpoints - login ke baad hi access honge
