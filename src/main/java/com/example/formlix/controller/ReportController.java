@@ -160,8 +160,5 @@ public class ReportController {
         }
     }
 
-    @GetMapping("/health")
-    public ResponseEntity<String> health() {
-        return ResponseEntity.ok("Report Generator Service is running");
-    }
+    
 }
