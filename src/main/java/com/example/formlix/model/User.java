@@ -10,6 +10,7 @@ import java.util.Collections;
 
 @Entity
 @Data
+@Table(name = "users") 
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
