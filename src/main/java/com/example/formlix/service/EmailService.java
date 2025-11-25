@@ -1,20 +1,24 @@
 package com.example.formlix.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class EmailService {
-
+    
     private final JavaMailSender mailSender;
 
+    @Async // ✅ Email background me jayega
     public void sendRegistrationEmail(String toEmail, String userName) {
         try {
             SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom("your-email@gmail.com");
+            message.setFrom("formlix5@gmail.com"); // ✅ Your actual email
             message.setTo(toEmail);
             message.setSubject("Welcome to Formlix! 🎉");
             message.setText(
@@ -25,18 +29,19 @@ public class EmailService {
                             "Best Regards,\n" +
                             "Formlix Team"
             );
-
             mailSender.send(message);
-            System.out.println("✅ Registration email sent to: " + toEmail);
+            log.info("✅ Registration email sent to: {}", toEmail);
         } catch (Exception e) {
-            System.err.println("❌ Failed to send registration email: " + e.getMessage());
+            log.error("❌ Failed to send registration email to {}: {}", toEmail, e.getMessage());
+            // Don't throw exception - just log it
         }
     }
 
+    @Async
     public void sendLoginEmail(String toEmail, String userName) {
         try {
             SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom("your-email@gmail.com");
+            message.setFrom("formlix5@gmail.com");
             message.setTo(toEmail);
             message.setSubject("Login Alert - Formlix 🔐");
             message.setText(
@@ -46,20 +51,20 @@ public class EmailService {
                             "Best Regards,\n" +
                             "Formlix Team"
             );
-
             mailSender.send(message);
-            System.out.println("✅ Login email sent to: " + toEmail);
+            log.info("✅ Login email sent to: {}", toEmail);
         } catch (Exception e) {
-            System.err.println("❌ Failed to send login email: " + e.getMessage());
+            log.error("❌ Failed to send login email to {}: {}", toEmail, e.getMessage());
         }
     }
 
-    // ✅ New method for Contact/Footer form
+    @Async
     public void sendContactFormEmail(String fromEmail, String userMessage) {
         try {
             SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom("your-email@gmail.com");
-            message.setTo("formlix5@gmail.com"); // ✅ Your company email
+            message.setFrom("formlix5@gmail.com");
+            message.setTo("formlix5@gmail.com");
+            message.setReplyTo(fromEmail); // ✅ User ko reply kar sakte ho
             message.setSubject("New Contact Form Message - Formlix 📬");
             message.setText(
                     "You have received a new message from the Formlix contact form:\n\n" +
@@ -68,11 +73,10 @@ public class EmailService {
                             "---\n" +
                             "This is an automated message from Formlix Contact Form."
             );
-
             mailSender.send(message);
-            System.out.println("✅ Contact form email sent from: " + fromEmail);
+            log.info("✅ Contact form email sent from: {}", fromEmail);
         } catch (Exception e) {
-            System.err.println("❌ Failed to send contact form email: " + e.getMessage());
+            log.error("❌ Failed to send contact form email from {}: {}", fromEmail, e.getMessage());
         }
     }
 }
