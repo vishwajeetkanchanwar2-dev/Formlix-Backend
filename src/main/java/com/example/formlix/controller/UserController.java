@@ -27,18 +27,16 @@ public class UserController {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtils jwtUtil;
     private final AuthenticationManager authenticationManager;
-    private final EmailService emailService; // ✅ Email service inject kiya
+    private final EmailService emailService;
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
         try {
-            // Check if email already exists
             if (userRepository.findByEmail(request.getEmail()).isPresent()) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                         .body(new AuthResponse("Email already registered"));
             }
 
-            // Create new user with name
             User user = User.builder()
                     .name(request.getName())
                     .email(request.getEmail())
@@ -46,16 +44,22 @@ public class UserController {
                     .build();
 
             userRepository.save(user);
-
-            // ✅ Send registration email
             emailService.sendRegistrationEmail(user.getEmail(), user.getName());
-
-            // Generate JWT token
             String token = jwtUtil.generateToken(user.getEmail());
 
-            return ResponseEntity.ok(new AuthResponse(token, user.getEmail(), user.getName()));
+            // ✅ PROPER RESPONSE WITH ALL USER DATA
+            AuthResponse response = new AuthResponse(
+                    token,
+                    user.getEmail(),
+                    user.getName(),
+                    user.getId()
+            );
+
+            System.out.println("✅ Registration Response: " + response);
+            return ResponseEntity.ok(response);
 
         } catch (Exception e) {
+            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new AuthResponse("Registration failed: " + e.getMessage()));
         }
@@ -64,27 +68,43 @@ public class UserController {
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest request) {
         try {
-            // Authenticate user
+            // ✅ AUTHENTICATE FIRST
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
             );
 
-            // Get user details
+            // ✅ FETCH USER DETAILS
             User user = userRepository.findByEmail(request.getEmail())
                     .orElseThrow(() -> new RuntimeException("User not found"));
 
-            // ✅ Send login email
+            // ✅ SEND EMAIL
             emailService.sendLoginEmail(user.getEmail(), user.getName());
 
-            // Generate JWT token
+            // ✅ GENERATE TOKEN
             String token = jwtUtil.generateToken(user.getEmail());
 
-            return ResponseEntity.ok(new AuthResponse(token, user.getEmail(), user.getName()));
+            // ✅ CREATE RESPONSE WITH CORRECT USER DATA
+            AuthResponse response = new AuthResponse(
+                    token,
+                    user.getEmail(),
+                    user.getName(),
+                    user.getId()
+            );
+
+            // ✅ DEBUG LOG - Check karo console me
+            System.out.println("✅ Login successful for user:");
+            System.out.println("   ID: " + user.getId());
+            System.out.println("   Name: " + user.getName());
+            System.out.println("   Email: " + user.getEmail());
+            System.out.println("   Token generated: " + token.substring(0, 20) + "...");
+
+            return ResponseEntity.ok(response);
 
         } catch (BadCredentialsException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(new AuthResponse("Invalid email or password"));
         } catch (Exception e) {
+            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new AuthResponse("Login failed: " + e.getMessage()));
         }
@@ -97,15 +117,20 @@ public class UserController {
             User user = userRepository.findByEmail(email)
                     .orElseThrow(() -> new RuntimeException("User not found"));
 
-            return ResponseEntity.ok(new AuthResponse(null, user.getEmail(), user.getName()));
+            AuthResponse response = new AuthResponse(
+                    null,
+                    user.getEmail(),
+                    user.getName(),
+                    user.getId()
+            );
+
+            System.out.println("✅ /me endpoint called for: " + user.getName() + " (ID: " + user.getId() + ")");
+            return ResponseEntity.ok(response);
+
         } catch (Exception e) {
+            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new AuthResponse("Error fetching user details"));
         }
-    }
-
-    @GetMapping("/health")
-    public ResponseEntity<String> health() {
-        return ResponseEntity.ok("Report Generator Service is running");
     }
 }
