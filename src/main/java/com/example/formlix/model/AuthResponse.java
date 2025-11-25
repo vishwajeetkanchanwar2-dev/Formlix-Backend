@@ -10,14 +10,24 @@ import lombok.NoArgsConstructor;
 public class AuthResponse {
     private String token;
     private String email;
-    private String username;  // ✅ This will be the display name
+    private String username;  // Display name
     private String message;
+    private Long id;  // ✅ USER ID ADD KIYA
 
-    // Constructor for success with token
+    // Constructor for success with token (OLD - backward compatibility)
     public AuthResponse(String token, String email, String username) {
         this.token = token;
         this.email = email;
-        this.username = username;  // ✅ Pass name here
+        this.username = username;
+        this.message = "Authentication successful";
+    }
+
+    // ✅ NEW Constructor with USER ID
+    public AuthResponse(String token, String email, String username, Long id) {
+        this.token = token;
+        this.email = email;
+        this.username = username;
+        this.id = id;  // ✅ ID include kiya
         this.message = "Authentication successful";
     }
 
