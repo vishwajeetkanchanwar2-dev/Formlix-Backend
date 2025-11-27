@@ -1,130 +1,37 @@
-package com.example.formlix.controller;
+package com.example.formlix.service;
 
-import com.example.formlix.model.AuthResponse;
-import com.example.formlix.model.LoginRequest;
-import com.example.formlix.model.RegisterRequest;
-import com.example.formlix.model.User;
-import com.example.formlix.repository.Userrepo;
-import com.example.formlix.utils.JwtUtils;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.web.bind.annotation.*;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.stereotype.Service;
 
-@RestController
-@RequestMapping("/api/user")
-@CrossOrigin("*")
+@Service
 @RequiredArgsConstructor
-public class UserController {
+@Slf4j
+public class EmailService {
 
-    private final Userrepo userRepository;
-    private final PasswordEncoder passwordEncoder;
-    private final JwtUtils jwtUtil;
-    private final AuthenticationManager authenticationManager;
+    private final JavaMailSender mailSender;
 
-    @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
+    // ✅ Only Contact form email method
+    public void sendContactFormEmail(String fromEmail, String userMessage) {
         try {
-            if (userRepository.findByEmail(request.getEmail()).isPresent()) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                        .body(new AuthResponse("Email already registered"));
-            }
-
-            User user = User.builder()
-                    .name(request.getName())
-                    .email(request.getEmail())
-                    .password(passwordEncoder.encode(request.getPassword()))
-                    .build();
-
-            userRepository.save(user);
-            String token = jwtUtil.generateToken(user.getEmail());
-
-            // ✅ PROPER RESPONSE WITH ALL USER DATA
-            AuthResponse response = new AuthResponse(
-                    token,
-                    user.getEmail(),
-                    user.getName(),
-                    user.getId()
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom("your-email@gmail.com");
+            message.setTo("formlix5@gmail.com"); // ✅ Your company email
+            message.setSubject("New Contact Form Message - Formlix 📬");
+            message.setText(
+                    "You have received a new message from the Formlix contact form:\n\n" +
+                            "From: " + fromEmail + "\n\n" +
+                            "Message:\n" + userMessage + "\n\n" +
+                            "---\n" +
+                            "This is an automated message from Formlix Contact Form."
             );
 
-            System.out.println("✅ Registration Response: " + response);
-            return ResponseEntity.ok(response);
-
+            mailSender.send(message);
+            log.info("✅ Contact form email sent from: {}", fromEmail);
         } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new AuthResponse("Registration failed: " + e.getMessage()));
-        }
-    }
-
-    @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest request) {
-        try {
-            // ✅ AUTHENTICATE FIRST
-            Authentication authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
-            );
-
-            // ✅ FETCH USER DETAILS
-            User user = userRepository.findByEmail(request.getEmail())
-                    .orElseThrow(() -> new RuntimeException("User not found"));
-
-            // ✅ GENERATE TOKEN
-            String token = jwtUtil.generateToken(user.getEmail());
-
-            // ✅ CREATE RESPONSE WITH CORRECT USER DATA
-            AuthResponse response = new AuthResponse(
-                    token,
-                    user.getEmail(),
-                    user.getName(),
-                    user.getId()
-            );
-
-            // ✅ DEBUG LOG - Check karo console me
-            System.out.println("✅ Login successful for user:");
-            System.out.println("   ID: " + user.getId());
-            System.out.println("   Name: " + user.getName());
-            System.out.println("   Email: " + user.getEmail());
-            System.out.println("   Token generated: " + token.substring(0, 20) + "...");
-
-            return ResponseEntity.ok(response);
-
-        } catch (BadCredentialsException e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new AuthResponse("Invalid email or password"));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new AuthResponse("Login failed: " + e.getMessage()));
-        }
-    }
-
-    @GetMapping("/me")
-    public ResponseEntity<?> getCurrentUser(Authentication authentication) {
-        try {
-            String email = authentication.getName();
-            User user = userRepository.findByEmail(email)
-                    .orElseThrow(() -> new RuntimeException("User not found"));
-
-            AuthResponse response = new AuthResponse(
-                    null,
-                    user.getEmail(),
-                    user.getName(),
-                    user.getId()
-            );
-
-            System.out.println("✅ /me endpoint called for: " + user.getName() + " (ID: " + user.getId() + ")");
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new AuthResponse("Error fetching user details"));
+            log.error("❌ Failed to send contact form email from {}: {}", fromEmail, e.getMessage());
         }
     }
 }
