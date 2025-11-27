@@ -5,7 +5,6 @@ import com.example.formlix.model.LoginRequest;
 import com.example.formlix.model.RegisterRequest;
 import com.example.formlix.model.User;
 import com.example.formlix.repository.Userrepo;
-import com.example.formlix.service.EmailService;
 import com.example.formlix.utils.JwtUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -27,7 +26,6 @@ public class UserController {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtils jwtUtil;
     private final AuthenticationManager authenticationManager;
-    private final EmailService emailService;
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
@@ -44,7 +42,6 @@ public class UserController {
                     .build();
 
             userRepository.save(user);
-            emailService.sendRegistrationEmail(user.getEmail(), user.getName());
             String token = jwtUtil.generateToken(user.getEmail());
 
             // ✅ PROPER RESPONSE WITH ALL USER DATA
@@ -76,9 +73,6 @@ public class UserController {
             // ✅ FETCH USER DETAILS
             User user = userRepository.findByEmail(request.getEmail())
                     .orElseThrow(() -> new RuntimeException("User not found"));
-
-            // ✅ SEND EMAIL
-            emailService.sendLoginEmail(user.getEmail(), user.getName());
 
             // ✅ GENERATE TOKEN
             String token = jwtUtil.generateToken(user.getEmail());
