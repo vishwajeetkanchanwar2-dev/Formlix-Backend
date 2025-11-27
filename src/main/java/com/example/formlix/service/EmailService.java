@@ -1,82 +1,130 @@
-package com.example.formlix.service;
+package com.example.formlix.controller;
 
+import com.example.formlix.model.AuthResponse;
+import com.example.formlix.model.LoginRequest;
+import com.example.formlix.model.RegisterRequest;
+import com.example.formlix.model.User;
+import com.example.formlix.repository.Userrepo;
+import com.example.formlix.utils.JwtUtils;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.scheduling.annotation.Async;
-import org.springframework.stereotype.Service;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.bind.annotation.*;
 
-@Slf4j
-@Service
+@RestController
+@RequestMapping("/api/user")
+@CrossOrigin("*")
 @RequiredArgsConstructor
-public class EmailService {
-    
-    private final JavaMailSender mailSender;
+public class UserController {
 
-    @Async // ✅ Email background me jayega
-    public void sendRegistrationEmail(String toEmail, String userName) {
+    private final Userrepo userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtUtils jwtUtil;
+    private final AuthenticationManager authenticationManager;
+
+    @PostMapping("/register")
+    public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
         try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom("formlix5@gmail.com"); // ✅ Your actual email
-            message.setTo(toEmail);
-            message.setSubject("Welcome to Formlix! 🎉");
-            message.setText(
-                    "Hi " + userName + ",\n\n" +
-                            "Welcome to Formlix! Your account has been successfully created.\n\n" +
-                            "Email: " + toEmail + "\n\n" +
-                            "Thank you for registering with us!\n\n" +
-                            "Best Regards,\n" +
-                            "Formlix Team"
+            if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(new AuthResponse("Email already registered"));
+            }
+
+            User user = User.builder()
+                    .name(request.getName())
+                    .email(request.getEmail())
+                    .password(passwordEncoder.encode(request.getPassword()))
+                    .build();
+
+            userRepository.save(user);
+            String token = jwtUtil.generateToken(user.getEmail());
+
+            // ✅ PROPER RESPONSE WITH ALL USER DATA
+            AuthResponse response = new AuthResponse(
+                    token,
+                    user.getEmail(),
+                    user.getName(),
+                    user.getId()
             );
-            mailSender.send(message);
-            log.info("✅ Registration email sent to: {}", toEmail);
+
+            System.out.println("✅ Registration Response: " + response);
+            return ResponseEntity.ok(response);
+
         } catch (Exception e) {
-            log.error("❌ Failed to send registration email to {}: {}", toEmail, e.getMessage());
-            // Don't throw exception - just log it
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new AuthResponse("Registration failed: " + e.getMessage()));
         }
     }
 
-    @Async
-    public void sendLoginEmail(String toEmail, String userName) {
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@RequestBody LoginRequest request) {
         try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom("formlix5@gmail.com");
-            message.setTo(toEmail);
-            message.setSubject("Login Alert - Formlix 🔐");
-            message.setText(
-                    "Hi " + userName + ",\n\n" +
-                            "You have successfully logged into your Formlix account.\n\n" +
-                            "If this wasn't you, please secure your account immediately.\n\n" +
-                            "Best Regards,\n" +
-                            "Formlix Team"
+            // ✅ AUTHENTICATE FIRST
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
             );
-            mailSender.send(message);
-            log.info("✅ Login email sent to: {}", toEmail);
+
+            // ✅ FETCH USER DETAILS
+            User user = userRepository.findByEmail(request.getEmail())
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            // ✅ GENERATE TOKEN
+            String token = jwtUtil.generateToken(user.getEmail());
+
+            // ✅ CREATE RESPONSE WITH CORRECT USER DATA
+            AuthResponse response = new AuthResponse(
+                    token,
+                    user.getEmail(),
+                    user.getName(),
+                    user.getId()
+            );
+
+            // ✅ DEBUG LOG - Check karo console me
+            System.out.println("✅ Login successful for user:");
+            System.out.println("   ID: " + user.getId());
+            System.out.println("   Name: " + user.getName());
+            System.out.println("   Email: " + user.getEmail());
+            System.out.println("   Token generated: " + token.substring(0, 20) + "...");
+
+            return ResponseEntity.ok(response);
+
+        } catch (BadCredentialsException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new AuthResponse("Invalid email or password"));
         } catch (Exception e) {
-            log.error("❌ Failed to send login email to {}: {}", toEmail, e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new AuthResponse("Login failed: " + e.getMessage()));
         }
     }
 
-    @Async
-    public void sendContactFormEmail(String fromEmail, String userMessage) {
+    @GetMapping("/me")
+    public ResponseEntity<?> getCurrentUser(Authentication authentication) {
         try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom("formlix5@gmail.com");
-            message.setTo("formlix5@gmail.com");
-            message.setReplyTo(fromEmail); // ✅ User ko reply kar sakte ho
-            message.setSubject("New Contact Form Message - Formlix 📬");
-            message.setText(
-                    "You have received a new message from the Formlix contact form:\n\n" +
-                            "From: " + fromEmail + "\n\n" +
-                            "Message:\n" + userMessage + "\n\n" +
-                            "---\n" +
-                            "This is an automated message from Formlix Contact Form."
+            String email = authentication.getName();
+            User user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            AuthResponse response = new AuthResponse(
+                    null,
+                    user.getEmail(),
+                    user.getName(),
+                    user.getId()
             );
-            mailSender.send(message);
-            log.info("✅ Contact form email sent from: {}", fromEmail);
+
+            System.out.println("✅ /me endpoint called for: " + user.getName() + " (ID: " + user.getId() + ")");
+            return ResponseEntity.ok(response);
+
         } catch (Exception e) {
-            log.error("❌ Failed to send contact form email from {}: {}", fromEmail, e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new AuthResponse("Error fetching user details"));
         }
     }
 }
